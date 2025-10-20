@@ -1,44 +1,86 @@
+using System.Runtime.InteropServices;
+using EloisaSantos.Models;
+using Microsoft.AspNetCore.Mvc;
+
 var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
+builder.Services.AddDbContext<AppDataContext>();
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.MapGet("/", () => "API de consumo de água");
 
-app.UseHttpsRedirection();
-
-var summaries = new[]
+//POST: /api/produto/cadastrar
+app.MapPost("/api/produto/cadastrar",
+    ([FromBody] Consumo consumo,
+    [FromServices] AppDataContext ctx) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
 
-app.MapGet("/weatherforecast", () =>
+    // Produto? resultado =
+    //     ctx.Produtos.FirstOrDefault(x => x.Nome == produto.Nome);
+    // if (resultado is null)
+    // {
+    //     ctx.Produtos.Add(produto);
+    //     ctx.SaveChanges();
+    //     return Results.Created("", produto);
+    // }
+    // else
+    // {
+    //     return Results.Conflict("Esse produto já existe!");
+    // }
+});
+
+//GET:/api/consumo/listar
+app.MapGet("/api/consumo/listar",
+    ([FromServices] AppDataContext ctx) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
+    if (ctx.Consumos.Any())
+    {
+        return Results.Ok(ctx.Consumos.ToList());
+    } 
+
+    return Results.NotFound("Lista vazia!");
+});
+
+//GET: /api/consumo/buscar/nome_do_produto
+app.MapGet("/api/consumo/buscar/{cpf}/{mes}/{ano}",
+    ([FromRoute]string cpf, [FromRoute]string mes, [FromRoute]string ano,
+    [FromServices] AppDataContext ctx) =>
+{
+    //expressão lambda
+    // Produto? resultado = ctx.Produtos.FirstOrDefault(x => x.Nome == nome);
+    // if (resultado == null)
+    // {
+    //     return Results.NotFound("Produto não encontrado!");
+    // }
+    // return Results.Ok(resultado);
+});
+
+
+
+app.MapDelete("/api/produto/remover/{cpf}/{mes}/{ano}",
+    ([FromRoute]string cpf, [FromRoute]string mes, [FromRoute]string ano,
+    [FromServices] AppDataContext ctx) =>
+{
+    // Produto? resultado = ctx.Produtos.Find(id);
+    // if (resultado == null)
+    // {
+    //     return Results.NotFound("Produto não encontrado!");
+    // }
+
+    // ctx.Produtos.Remove(resultado);
+    // ctx.SaveChanges();
+    // return Results.Ok("Produto removido com sucesso!");
+});
+
+//GET:/api/consumo/listar
+app.MapGet("/api/consumo/total-geral",
+    ([FromServices] AppDataContext ctx) =>
+{
+    // if (ctx.Consumos.Any())
+    // {
+    //     return Results.Ok(ctx.Consumos.ToList());
+    // } 
+
+    // return Results.NotFound("Lista vazia!");
+});
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
