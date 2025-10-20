@@ -1,0 +1,6 @@
+@EloisaSantos_HostAddress = http://localhost:5044
+
+GET {{EloisaSantos_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
