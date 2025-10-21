@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using EloisaSantos.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDataContext>();
@@ -8,24 +9,91 @@ var app = builder.Build();
 
 app.MapGet("/", () => "API de consumo de água");
 
-//POST: /api/produto/cadastrar
-app.MapPost("/api/produto/cadastrar",
-    ([FromBody] Consumo consumo,
+//POST: /api/consumo/cadastrar"
+app.MapPost("/api/consumo/cadastrar", 
+    async ([FromBody] Consumo consumo,
     [FromServices] AppDataContext ctx) =>
 {
+    if (consumo.mes < 1 || consumo.mes > 12)
+    {
+        return Results.BadRequest("Mês inválido!");
+    }
 
-    // Produto? resultado =
-    //     ctx.Produtos.FirstOrDefault(x => x.Nome == produto.Nome);
-    // if (resultado is null)
-    // {
-    //     ctx.Produtos.Add(produto);
-    //     ctx.SaveChanges();
-    //     return Results.Created("", produto);
-    // }
-    // else
-    // {
-    //     return Results.Conflict("Esse produto já existe!");
-    // }
+    if (consumo.ano < 2000)
+    {
+        return Results.BadRequest("Ano inválido!");
+    }
+
+    if (consumo.m3Consumidos <= 0)
+    {
+        return Results.BadRequest("Valor inválido!");
+    }
+
+    var encontrado = await ctx.Consumos
+        .Where(c => c.cpf.Contains(consumo.cpf))
+        .Where(c => c.mes.Equals(consumo.mes))
+        .Where(c => c.ano.Equals(consumo.ano))
+        .ToListAsync();
+
+    if (encontrado.Any())
+    {
+        return Results.Conflict("Já cadastrado!");
+    }
+
+    if (consumo.m3Consumidos < 10)
+    {
+        consumo.consumoFaturado = 10;
+    }
+    else
+    {
+        consumo.consumoFaturado = consumo.m3Consumidos;
+    }
+
+    if (consumo.m3Consumidos < 11)
+    {
+        consumo.tarifa = 2.50;
+    }
+    else if (consumo.m3Consumidos > 10 || consumo.m3Consumidos <= 20)
+    {
+        consumo.tarifa = 3.50;
+    }
+    else if (consumo.m3Consumidos > 20 || consumo.m3Consumidos <= 50)
+    {
+        consumo.tarifa = 5.00;
+    }
+    else
+    {
+        consumo.tarifa = 6.50;
+    }
+
+    consumo.valorAgua = consumo.consumoFaturado * consumo.tarifa;
+
+    if (consumo.bandeira == "verde")
+    {
+        consumo.adicionalBandeira = 0;
+    }
+    else if (consumo.bandeira == "amarela")
+    {
+        consumo.adicionalBandeira = consumo.valorAgua * 0.10;
+    }
+    else if (consumo.bandeira == "vermelha")
+    {
+        consumo.adicionalBandeira = consumo.valorAgua * 0.20;
+    }
+
+    if (consumo.possuiEsgoto)
+    {
+        consumo.taxaEsgoto = (consumo.valorAgua + consumo.adicionalBandeira) * 0.80;
+    }
+    else
+    {
+        consumo.taxaEsgoto = 0;
+    }
+
+    consumo.total = consumo.valorAgua + consumo.adicionalBandeira + consumo.taxaEsgoto;
+
+    ctx.Consumos.Add(consumo);
+    return Results.Ok(consumo);
 });
 
 //GET:/api/consumo/listar
