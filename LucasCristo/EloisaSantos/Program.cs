@@ -9,7 +9,6 @@ var app = builder.Build();
 
 app.MapGet("/", () => "API de consumo de água");
 
-//POST: /api/consumo/cadastrar"
 app.MapPost("/api/consumo/cadastrar", 
     async ([FromBody] Consumo consumo,
     [FromServices] AppDataContext ctx) =>
@@ -35,7 +34,7 @@ app.MapPost("/api/consumo/cadastrar",
         .Where(c => c.ano.Equals(consumo.ano))
         .ToListAsync();
 
-    if (encontrado.Any())
+    if (encontrado.Count != 0)
     {
         return Results.Conflict("Já cadastrado!");
     }
@@ -68,17 +67,21 @@ app.MapPost("/api/consumo/cadastrar",
 
     consumo.valorAgua = consumo.consumoFaturado * consumo.tarifa;
 
-    if (consumo.bandeira == "verde")
+    if (consumo.bandeira == "Verde" || consumo.bandeira == "verde")
     {
         consumo.adicionalBandeira = 0;
     }
-    else if (consumo.bandeira == "amarela")
+    else if (consumo.bandeira == "Amarela" || consumo.bandeira == "amarela")
     {
         consumo.adicionalBandeira = consumo.valorAgua * 0.10;
     }
-    else if (consumo.bandeira == "vermelha")
+    else if (consumo.bandeira == "Vermelha" || consumo.bandeira == "vermelha")
     {
         consumo.adicionalBandeira = consumo.valorAgua * 0.20;
+    }
+    else
+    {
+        return Results.BadRequest("Bandeira inválida!");
     }
 
     if (consumo.possuiEsgoto)
@@ -93,10 +96,10 @@ app.MapPost("/api/consumo/cadastrar",
     consumo.total = consumo.valorAgua + consumo.adicionalBandeira + consumo.taxaEsgoto;
 
     ctx.Consumos.Add(consumo);
+    ctx.SaveChanges();
     return Results.Ok(consumo);
 });
 
-//GET:/api/consumo/listar
 app.MapGet("/api/consumo/listar",
     ([FromServices] AppDataContext ctx) =>
 {
@@ -108,47 +111,52 @@ app.MapGet("/api/consumo/listar",
     return Results.NotFound("Lista vazia!");
 });
 
-//GET: /api/consumo/buscar/nome_do_produto
-app.MapGet("/api/consumo/buscar/{cpf}/{mes}/{ano}",
-    ([FromRoute]string cpf, [FromRoute]string mes, [FromRoute]string ano,
+app.MapGet("/api/consumo/buscar/{cpf}/{mes}/{ano}", async
+    ([FromRoute]string cpf, [FromRoute]int mes, [FromRoute]int ano,
     [FromServices] AppDataContext ctx) =>
 {
-    //expressão lambda
-    // Produto? resultado = ctx.Produtos.FirstOrDefault(x => x.Nome == nome);
-    // if (resultado == null)
-    // {
-    //     return Results.NotFound("Produto não encontrado!");
-    // }
-    // return Results.Ok(resultado);
+
+    var consumo = await ctx.Consumos
+        .Where(c => c.cpf.Contains(cpf))
+        .Where(c => c.mes.Equals(mes))
+        .Where(c => c.ano.Equals(ano))
+        .ToListAsync();
+
+    return consumo.Any() ? Results.Ok(consumo) : Results.NotFound("Nenhum consumo encontrado.");
+    
 });
 
 
-
-app.MapDelete("/api/produto/remover/{cpf}/{mes}/{ano}",
-    ([FromRoute]string cpf, [FromRoute]string mes, [FromRoute]string ano,
+app.MapDelete("/api/consumo/remover/{cpf}/{mes}/{ano}", async
+    ([FromRoute]string cpf, [FromRoute]int mes, [FromRoute]int ano,
     [FromServices] AppDataContext ctx) =>
 {
-    // Produto? resultado = ctx.Produtos.Find(id);
-    // if (resultado == null)
-    // {
-    //     return Results.NotFound("Produto não encontrado!");
-    // }
+    var consumo = await ctx.Consumos
+        .Where(c => c.cpf.Contains(cpf))
+        .Where(c => c.mes.Equals(mes))
+        .Where(c => c.ano.Equals(ano))
+        .ToListAsync();
 
-    // ctx.Produtos.Remove(resultado);
-    // ctx.SaveChanges();
-    // return Results.Ok("Produto removido com sucesso!");
+    var encontrado = consumo.FirstOrDefault();
+
+    if (encontrado != null)
+    {
+        ctx.Consumos.Remove(encontrado);
+        ctx.SaveChanges();
+        return Results.Ok("Consumo removido!");
+    } else
+    {
+        return Results.NotFound("Consumo não encontrado.");
+    }
 });
 
-//GET:/api/consumo/listar
-app.MapGet("/api/consumo/total-geral",
+app.MapGet("/api/consumo/total-geral", async
     ([FromServices] AppDataContext ctx) =>
 {
-    // if (ctx.Consumos.Any())
-    // {
-    //     return Results.Ok(ctx.Consumos.ToList());
-    // } 
+    var somaTotal = await ctx.Consumos.SumAsync(c => c.total);
 
-    // return Results.NotFound("Lista vazia!");
+    return Results.Ok(somaTotal);
+
 });
 
 app.Run();
